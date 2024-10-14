@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Route Management</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1, h2 {
+      color: #333;
+    }
+    form {
+      background-color: #f0f0f0;
+      padding: 20px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 5px;
+      margin-bottom: 10px;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #4CAF50;
+      color: white;
+    }
+    tr:nth-child(even) {
+      background-color: #f2f2f2;
+    }
+    .edit-btn, .save-btn, .cancel-btn {
+      margin-right: 5px;
+    }
+    #successMessage {
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 4px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+<h1>Route Management</h1>
+
+<div id="successMessage"></div>
+
+<form id="routeForm">
+  <h2>Create a New Route</h2>
+
+  <label for="endLocation">End Location:</label>
+  <input type="text" id="endLocation" name="endLocation" required>
+
+  <label for="pincode">Pincode:</label>
+  <input type="text" id="pincode" name="pincode" required>
+
+  <label for="modeOfTransport">Mode of Transport:</label>
+  <input type="text" id="modeOfTransport" name="modeOfTransport" required>
+
+  <label for="username">Username:</label>
+  <input type="text" id="username" name="username" required>
+
+  <button type="submit">Create Route</button>
+</form>
+
+<h2>All Routes</h2>
+<button id="deleteSelected" style="display:none;">Delete Selected</button>
+<table id="routesTable">
+  <thead>
+  <tr>
+    <th><input type="checkbox" id="selectAll"></th>
+    <th>ID</th>
+    <th>End Location</th>
+    <th>Pincode</th>
+    <th>Mode of Transport</th>
+    <th>Username</th>
+    <th>Actions</th>
+  </tr>
+  </thead>
+  <tbody>
+  <!-- Rows will be dynamically added here -->
+  </tbody>
+</table>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const deleteSelectedBtn = document.getElementById('deleteSelected');
+
+    function showMessage(message, isError = false) {
+      const successMessage = document.getElementById('successMessage');
+      successMessage.textContent = message;
+      successMessage.style.display = 'block';
+      successMessage.style.backgroundColor = isError ? '#f44336' : '#4CAF50';
+      successMessage.style.color = 'white';
+      setTimeout(() => {
+        successMessage.style.display = 'none';
+      }, 3000);
+    }
+
+    function fetchRoutes() {
+      fetch('/route-management/routes')
+        .then(response => response.json())
+        .then(data => {
+          const routesTableBody = document.querySelector('#routesTable tbody');
+          routesTableBody.innerHTML = ''; // Clear the table body
+
+          data.forEach(route => {
+            const row = document.createElement('tr');
+            row.dataset.id = route.id;
+            row.innerHTML = `
+              <td><input type="checkbox" class="route-checkbox"></td>
+              <td>${route.id}</td>
+              <td>${route.endLocation}</td>
+              <td>${route.pincode}</td>
+              <td>${route.modeOfTransport}</td>
+              <td>${route.username}</td>
+              <td>
+                <button class="edit-btn">Edit</button>
+                <button class="save-btn" style="display:none;">Save</button>
+                <button class="cancel-btn" style="display:none;">Cancel</button>
+              </td>
+            `;
+            routesTableBody.appendChild(row);
+          });
+          updateDeleteSelectedButton();
+        })
+        .catch(error => {
+          console.error('Error fetching routes:', error);
+          showMessage('Error fetching routes.', true);
+        });
+    }
+
+    function updateDeleteSelectedButton() {
+      const checkedBoxes = document.querySelectorAll('.route-checkbox:checked');
+      deleteSelectedBtn.style.display = checkedBoxes.length > 0 ? 'block' : 'none';
+    }
+
+    // Fetch all routes when the page loads
+    fetchRoutes();
+
+    document.getElementById('routeForm').addEventListener('submit', function (event) {
+      event.preventDefault();
+      const formData = new FormData(this);
+
+      fetch('/route-management/routes', {
+        method: 'POST',
+        body: formData,
+      })
+      .then(response => response.json())
+      .then(data => {
+        showMessage('Route created successfully!');
+        fetchRoutes();
+        this.reset();
+      })
+      .catch((error) => {
+        console.error('Error:', error);
+        showMessage('Error creating route.', true);
+      });
+    });
+
+    document.querySelector('#routesTable tbody').addEventListener('click', function(e) {
+      const row = e.target.closest('tr');
+      if (e.target.classList.contains('edit-btn')) {
+        row.classList.add('edit-mode');
+        row.querySelector('.edit-btn').style.display = 'none';
+        row.querySelector('.save-btn').style.display = 'inline-block';
+        row.querySelector('.cancel-btn').style.display = 'inline-block';
+
+        // Replace text with input fields
+        ['endLocation', 'pincode', 'modeOfTransport', 'username'].forEach(field => {
+          const cell = row.querySelector(`td:nth-child(${['id', 'endLocation', 'pincode', 'modeOfTransport', 'username'].indexOf(field) + 2})`);
+          const value = cell.textContent;
+          cell.innerHTML = `<input type="text" name="${field}" value="${value}">`;
+        });
+      } else if (e.target.classList.contains('save-btn')) {
+        const id = row.dataset.id;
+        const formData = new FormData();
+        row.querySelectorAll('input[name]').forEach(input => {
+          formData.append(input.name, input.value);
+        });
+
+        fetch(`/route-management/routes/${id}`, {
+          method: 'PUT',
+          body: formData,
+        })
+        .then(response => response.json())
+        .then(data => {
+          showMessage('Route updated successfully!');
+          fetchRoutes();
+        })
+        .catch((error) => {
+          console.error('Error:', error);
+          showMessage('Error updating route.', true);
+        });
+      } else if (e.target.classList.contains('cancel-btn')) {
+        fetchRoutes(); // This will reset the row to its original state
+      }
+    });
+
+    // Select All checkbox functionality
+    document.getElementById('selectAll').addEventListener('change', function(e) {
+      const checkboxes = document.querySelectorAll('.route-checkbox');
+      checkboxes.forEach(checkbox => checkbox.checked = e.target.checked);
+      updateDeleteSelectedButton();
+    });
+
+    // Individual checkbox functionality
+    document.querySelector('#routesTable tbody').addEventListener('change', function(e) {
+      if (e.target.classList.contains('route-checkbox')) {
+        updateDeleteSelectedButton();
+      }
+    });
+
+    // Delete Selected functionality
+    deleteSelectedBtn.addEventListener('click', function() {
+      const selectedRoutes = Array.from(document.querySelectorAll('.route-checkbox:checked')).map(checkbox => checkbox.closest('tr').dataset.id);
+
+      if (selectedRoutes.length === 0) {
+        showMessage('No routes selected for deletion.', true);
+        return;
+      }
+
+      if (confirm(`Are you sure you want to delete ${selectedRoutes.length} selected route(s)?`)) {
+        Promise.all(selectedRoutes.map(id =>
+          fetch(`/route-management/routes/${id}`, { method: 'DELETE' })
+        ))
+        .then(responses => {
+          if (responses.every(response => response.ok)) {
+            showMessage(`${selectedRoutes.length} route(s) deleted successfully!`);
+            fetchRoutes();
+          } else {
+            throw new Error('Failed to delete one or more routes');
+          }
+        })
+        .catch((error) => {
+          console.error('Error:', error);
+          showMessage('Error deleting routes.', true);
+        });
+      }
+    });
+  });
+</script>
+
+</body>
+</html>
