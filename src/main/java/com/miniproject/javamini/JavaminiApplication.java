@@ -7,7 +7,9 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.web.client.RestTemplate;
 
 @SpringBootApplication
-@EnableJpaRepositories("com.miniproject.javamini.route_management")
+@EnableJpaRepositories({"com.miniproject.javamini.route_management", "com.miniproject.javamini.user_management"})
+
+
 public class JavaminiApplication {
 
 	public static void main(String[] args) {
