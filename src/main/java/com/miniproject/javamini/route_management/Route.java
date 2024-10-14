@@ -8,10 +8,18 @@ public class Route {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "END_LOCATION")
     private String endLocation;
-    private String pincode;
+
+    @Column(name = "MODE_OF_TRANSPORT")
     private String modeOfTransport;
-    private String username; // Add this field for username
+
+    @Column(name = "PINCODE")
+    private String pincode;
+
+    @Column(name = "USERNAME")
+    private String username;
+
 
     // Default constructor
     public Route() {

@@ -3,6 +3,7 @@ package com.miniproject.javamini.user_management;
 import jakarta.persistence.*;
 
 @Entity
+@Table(name = "users")
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
