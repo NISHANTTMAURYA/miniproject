@@ -35,9 +35,11 @@ public class RouteManagementController {
     }
 
     @DeleteMapping("/routes")
-    public void deleteRoutes(@RequestBody List<Long> ids) {
+    public ResponseEntity<Void> deleteRoutes(@RequestBody List<Long> ids) {
         routeManagementService.deleteRoutes(ids);
+        return ResponseEntity.ok().build(); // Return a 200 OK status with no body
     }
+
 
     @GetMapping(value = "/users", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> getAllUsernames() {

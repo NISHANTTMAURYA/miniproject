@@ -297,28 +297,39 @@
       });
 
       deleteSelectedBtn.addEventListener('click', function() {
-          const selectedRoutes = Array.from(document.querySelectorAll('.route-checkbox:checked'))
-              .map(checkbox => checkbox.closest('tr').dataset.id);
+    const selectedRoutes = Array.from(document.querySelectorAll('.route-checkbox:checked'))
+        .map(checkbox => checkbox.closest('tr').dataset.id);
 
-          if (selectedRoutes.length === 0) return;
+    if (selectedRoutes.length === 0) return;
 
-          fetch('/route-management/routes', {
-              method: 'DELETE',
-              headers: {
-                  'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(selectedRoutes),
-          })
-          .then(response => response.json())
-          .then(data => {
-              showMessage('Selected routes deleted successfully!');
-              fetchRoutes();
-          })
-          .catch(error => {
-              console.error('Error:', error);
-              showMessage('Error deleting routes.', true);
-          });
-      });
+    // Confirm deletion
+    const confirmation = confirm(`Are you sure you want to delete the selected routes? (${selectedRoutes.length} selected)`);
+    if (!confirmation) return; // If not confirmed, exit
+
+    fetch('/route-management/routes', {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(selectedRoutes),
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.text(); // Change to text() to handle empty response
+    })
+    .then(data => {
+        showMessage('Selected routes deleted successfully!'); // Success message
+        fetchRoutes(); // Refresh routes
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showMessage('Error deleting routes: ' + error.message, true); // Show error message
+    });
+});
+
+
 
       selectAllCheckbox.addEventListener('change', function() {
           const checkboxes = document.querySelectorAll('.route-checkbox');
