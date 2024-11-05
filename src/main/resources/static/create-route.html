@@ -97,6 +97,9 @@
     .custom-marker {
         background: none;
         border: none;
+        display: flex;
+        justify-content: center;
+        align-items: center;
     }
 
     .start-marker {
@@ -121,11 +124,33 @@
     @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css');
 
     .fa-location-dot {
+        font-size: 24px;
         filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.5));
+    }
+
+    .start-marker i {
+        color: #4CAF50;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .end-marker i {
+        color: #f44336;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .marker-popup {
+        padding: 5px;
+        font-family: Arial, sans-serif;
+    }
+
+    .leaflet-div-icon {
+        background: transparent;
+        border: none;
     }
   </style>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
 
@@ -291,10 +316,10 @@
                 L.marker([startCoords.lat, startCoords.lng], {
                     icon: L.divIcon({
                         className: 'custom-marker start-marker',
-                        html: '<i class="fas fa-location-dot fa-2x"></i>',
-                        iconSize: [25, 41],
-                        iconAnchor: [12, 41],
-                        popupAnchor: [1, -34]
+                        html: '<i class="fa-solid fa-location-dot fa-2x"></i>',
+                        iconSize: [30, 30],
+                        iconAnchor: [15, 30],
+                        popupAnchor: [0, -30]
                     })
                 })
                 .bindPopup(`<div class="marker-popup">
@@ -320,10 +345,10 @@
                     L.marker([endCoords.lat, endCoords.lng], {
                         icon: L.divIcon({
                             className: 'custom-marker end-marker',
-                            html: '<i class="fas fa-location-dot fa-2x"></i>',
-                            iconSize: [25, 41],
-                            iconAnchor: [12, 41],
-                            popupAnchor: [1, -34]
+                            html: '<i class="fa-solid fa-location-dot fa-2x"></i>',
+                            iconSize: [30, 30],
+                            iconAnchor: [15, 30],
+                            popupAnchor: [0, -30]
                         })
                     })
                     .bindPopup(`<div class="marker-popup">
