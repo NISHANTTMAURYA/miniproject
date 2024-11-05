@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Route Management</title>
   <style>
+    #map {
+        height: 400px;
+        width: 100%;
+        margin: 20px 0;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
     body {
         font-family: Arial, sans-serif;
         margin: 0;
@@ -80,7 +87,16 @@
         color: red;
         margin-bottom: 10px;
     }
+    #map {
+        height: 400px;
+        width: 100%;
+        margin: 20px 0;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
   </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
 
@@ -129,9 +145,27 @@
   <button type="submit">Create Route</button>
 </form>
 
+<div id="map">
+    <div id="map-loading" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 10px; border-radius: 5px; z-index: 1000;">
+        Loading route...
+    </div>
+</div>
 
 <script>
   document.addEventListener("DOMContentLoaded", function() {
+      // Initialize the map globally right away
+      const map = L.map('map').setView([20.5937, 78.9629], 5); // Default center of India
+      
+      // Add the tile layer
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+
+      // Create layer groups for markers and routes
+      const markersLayer = L.layerGroup().addTo(map);
+      const routeLayer = L.layerGroup().addTo(map);
+
       const routeForm = document.getElementById('routeForm');
       const routesTable = document.getElementById('routesTable');
       const deleteSelectedBtn = document.getElementById('deleteSelected');
@@ -180,6 +214,10 @@
 
       async function fetchRoutes(username = '') {
         try {
+            // Clear existing layers before fetching new routes
+            markersLayer.clearLayers();
+            routeLayer.clearLayers();
+
             let url = '/route-management/routes';
             if (username) {
                 url += `?username=${encodeURIComponent(username)}`;
@@ -199,44 +237,78 @@
                 return;
             }
 
+            // Process all routes sequentially
             for (const route of data) {
                 let startCoords = null;
-                if (route.username) {
-                    try {
-                        console.log('Fetching home address for user:', route.username);
-                        
-                        const userResponse = await fetch(`/user-management/home-address?username=${encodeURIComponent(route.username)}`);
-                        if (!userResponse.ok) {
-                            console.error('User response not OK:', await userResponse.text());
-                            throw new Error('Failed to fetch home address');
-                        }
-                        
-                        const userData = await userResponse.json();
-                        console.log('User data received:', userData);
-                        
-                        if (userData && userData.homeAddress && userData.pincode) {
-                            const fullAddress = `${userData.homeAddress} ${userData.pincode}`;
-                            console.log('Attempting to geocode address:', fullAddress);
-                            startCoords = await geocodeAddress(fullAddress);
-                            
-                            if (!startCoords) {
-                                console.warn('Geocoding failed for address:', fullAddress);
-                            }
-                        } else {
-                            console.warn('Incomplete user data:', userData);
-                        }
-                    } catch (error) {
-                        console.error('Error in address processing:', error);
-                    }
-                }
-                
                 let endCoords = null;
+                
+                // Get end coordinates
                 try {
                     endCoords = await geocodeAddress(route.endLocation + ' ' + route.pincode);
                 } catch (error) {
                     console.error('Error fetching end coordinates:', error);
+                    continue; // Skip this route if end coordinates cannot be found
                 }
                 
+                // Get start coordinates from user's home address
+                if (route.username) {
+                    try {
+                        const userResponse = await fetch(`/user-management/home-address?username=${encodeURIComponent(route.username)}`);
+                        if (!userResponse.ok) {
+                            throw new Error('Failed to fetch home address');
+                        }
+                        
+                        const userData = await userResponse.json();
+                        if (userData && userData.homeAddress && userData.pincode) {
+                            const fullAddress = `${userData.homeAddress} ${userData.pincode}`;
+                            startCoords = await geocodeAddress(fullAddress);
+                        }
+                    } catch (error) {
+                        console.error('Error fetching start coordinates:', error);
+                        continue; // Skip this route if start coordinates cannot be found
+                    }
+                }
+
+                // Only proceed if we have both coordinates
+                if (startCoords && endCoords) {
+                    // Add markers for this route
+                    L.marker([startCoords.lat, startCoords.lng])
+                        .bindPopup(`Start: ${route.username}'s home`)
+                        .addTo(markersLayer);
+                    
+                    L.marker([endCoords.lat, endCoords.lng])
+                        .bindPopup(`End: ${route.endLocation}`)
+                        .addTo(markersLayer);
+
+                    // Fetch and display the route
+                    try {
+                        const routeResponse = await fetch(
+                            `https://router.project-osrm.org/route/v1/driving/${startCoords.lng},${startCoords.lat};${endCoords.lng},${endCoords.lat}?overview=full&geometries=geojson`
+                        );
+
+                        if (!routeResponse.ok) {
+                            throw new Error('Failed to fetch route');
+                        }
+
+                        const routeData = await routeResponse.json();
+
+                        if (routeData.routes && routeData.routes.length > 0) {
+                            // Add the route with a unique color
+                            const routeColor = `#${Math.floor(Math.random()*16777215).toString(16)}`;
+                            L.geoJSON(routeData.routes[0].geometry, {
+                                style: {
+                                    color: routeColor,
+                                    weight: 3,
+                                    opacity: 0.7
+                                }
+                            }).addTo(routeLayer);
+                        }
+                    } catch (error) {
+                        console.error('Error fetching route:', error);
+                    }
+                }
+
+                // Add row to table
                 const row = document.createElement('tr');
                 row.dataset.id = route.id;
                 row.innerHTML = `
@@ -258,6 +330,13 @@
                 `;
                 routesTableBody.appendChild(row);
             }
+
+            // Fit the map bounds to show all routes
+            if (routeLayer.getLayers().length > 0) {
+                const bounds = L.featureGroup([markersLayer, routeLayer]).getBounds();
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }
+
         } catch (error) {
             console.error('Error:', error);
             showMessage('Error fetching routes: ' + error.message, true);
@@ -392,12 +471,26 @@
       });
 
       // Add event listener for username dropdown
-      usernameDropdown.addEventListener('change', function(e) {
+      usernameDropdown.addEventListener('change', async function(e) {
+          if (e.target.value) {
+              try {
+                  const userData = await fetchUserHomeAddress(e.target.value);
+                  if (userData && userData.homeAddress) {
+                      const startCoords = await geocodeAddress(userData.homeAddress + ' ' + userData.pincode);
+                      if (startCoords) {
+                          window.startCoords = startCoords; // Store for later use
+                      }
+                  }
+              } catch (error) {
+                  console.error('Error fetching user home address:', error);
+              }
+          }
           fetchRoutes(e.target.value);
       });
 
       async function geocodeAddress(address) {
-        const apiKey = '9289340160b7436ba65e6add726263b7'; // Using the API key from your properties file
+        console.log('Geocoding address:', address);
+        const apiKey = '9289340160b7436ba65e6add726263b7';
         const encodedAddress = encodeURIComponent(address);
         const url = `https://api.opencagedata.com/geocode/v1/json?q=${encodedAddress}&key=${apiKey}`;
 
@@ -408,6 +501,7 @@
             }
             const data = await response.json();
             if (data.results && data.results.length > 0) {
+                console.log('Geocoding result:', data.results[0].geometry);
                 return data.results[0].geometry;
             }
             throw new Error('No results found for address');
@@ -425,6 +519,67 @@
       }
       // Call it once to verify
       testGeocoding();
+
+      async function displayRoute(startCoords, endCoords) {
+          const loadingElement = document.getElementById('map-loading');
+          loadingElement.style.display = 'block';
+          
+          try {
+              if (!startCoords || !endCoords) {
+                  console.error('Invalid coordinates:', { startCoords, endCoords });
+                  return;
+              }
+
+              console.log('Displaying route with coordinates:', { startCoords, endCoords });
+
+              // Clear existing markers and route
+              markersLayer.clearLayers();
+              routeLayer.clearLayers();
+
+              // Add markers
+              L.marker([startCoords.lat, startCoords.lng])
+                  .bindPopup('Start')
+                  .addTo(markersLayer);
+              L.marker([endCoords.lat, endCoords.lng])
+                  .bindPopup('End')
+                  .addTo(markersLayer);
+
+              // Use OSRM API to get the route
+              const response = await fetch(
+                  `https://router.project-osrm.org/route/v1/driving/${startCoords.lng},${startCoords.lat};${endCoords.lng},${endCoords.lat}?overview=full&geometries=geojson`
+              );
+              
+              if (!response.ok) {
+                  throw new Error('Failed to fetch route');
+              }
+
+              const data = await response.json();
+
+              if (data.routes && data.routes.length > 0) {
+                  // Add the route to the map
+                  L.geoJSON(data.routes[0].geometry, {
+                      style: {
+                          color: '#0000FF',
+                          weight: 3,
+                          opacity: 0.7
+                      }
+                  }).addTo(routeLayer);
+
+                  // Fit bounds to show the entire route
+                  const bounds = L.latLngBounds([
+                      [startCoords.lat, startCoords.lng],
+                      [endCoords.lat, endCoords.lng]
+                  ]);
+                  map.fitBounds(bounds, { padding: [50, 50] });
+              } else {
+                  console.error('No route found in response');
+              }
+          } catch (error) {
+              console.error('Error fetching route:', error);
+          } finally {
+              loadingElement.style.display = 'none';
+          }
+      }
   });
 </script>
 </body>
