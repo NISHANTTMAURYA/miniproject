@@ -201,16 +201,41 @@
 
             for (const route of data) {
                 let startCoords = null;
-                if (username) {
+                if (route.username) {
                     try {
-                        const userHome = await fetchUserHomeAddress(username);
-                        startCoords = await geocodeAddress(userHome.homeAddress);
+                        console.log('Fetching home address for user:', route.username);
+                        
+                        const userResponse = await fetch(`/user-management/home-address?username=${encodeURIComponent(route.username)}`);
+                        if (!userResponse.ok) {
+                            console.error('User response not OK:', await userResponse.text());
+                            throw new Error('Failed to fetch home address');
+                        }
+                        
+                        const userData = await userResponse.json();
+                        console.log('User data received:', userData);
+                        
+                        if (userData && userData.homeAddress && userData.pincode) {
+                            const fullAddress = `${userData.homeAddress} ${userData.pincode}`;
+                            console.log('Attempting to geocode address:', fullAddress);
+                            startCoords = await geocodeAddress(fullAddress);
+                            
+                            if (!startCoords) {
+                                console.warn('Geocoding failed for address:', fullAddress);
+                            }
+                        } else {
+                            console.warn('Incomplete user data:', userData);
+                        }
                     } catch (error) {
-                        console.error('Error fetching start coordinates:', error);
+                        console.error('Error in address processing:', error);
                     }
                 }
                 
-                const endCoords = await geocodeAddress(route.endLocation);
+                let endCoords = null;
+                try {
+                    endCoords = await geocodeAddress(route.endLocation + ' ' + route.pincode);
+                } catch (error) {
+                    console.error('Error fetching end coordinates:', error);
+                }
                 
                 const row = document.createElement('tr');
                 row.dataset.id = route.id;
@@ -372,25 +397,34 @@
       });
 
       async function geocodeAddress(address) {
-        const apiKey = '9289340160b7436ba65e6add726263b7'; // Replace with your OpenCage API key
-        const url = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(address)}&key=${apiKey}`;
+        const apiKey = '9289340160b7436ba65e6add726263b7'; // Using the API key from your properties file
+        const encodedAddress = encodeURIComponent(address);
+        const url = `https://api.opencagedata.com/geocode/v1/json?q=${encodedAddress}&key=${apiKey}`;
 
         try {
-          const response = await fetch(url);
-          if (!response.ok) {
-            throw new Error('Failed to geocode address');
-          }
-          const data = await response.json();
-          if (data.results && data.results.length > 0) {
-            return data.results[0].geometry;
-          } else {
-            return null;
-          }
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error('Geocoding request failed');
+            }
+            const data = await response.json();
+            if (data.results && data.results.length > 0) {
+                return data.results[0].geometry;
+            }
+            throw new Error('No results found for address');
         } catch (error) {
-          console.error('Error:', error);
-          return null;
+            console.error('Geocoding error:', error);
+            return null;
         }
       }
+
+      // Add this after defining geocodeAddress function
+      async function testGeocoding() {
+          const testAddress = "Mumbai 400001";
+          const result = await geocodeAddress(testAddress);
+          console.log('Test geocoding result:', result);
+      }
+      // Call it once to verify
+      testGeocoding();
   });
 </script>
 </body>

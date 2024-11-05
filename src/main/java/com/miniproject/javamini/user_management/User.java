@@ -15,6 +15,8 @@ public class User {
     private String homeAddress;
     private String pincode;
 
+   
+
     public User() {}
 
     public User(String username, String homeAddress, String pincode) {
@@ -54,5 +56,14 @@ public class User {
     public void setPincode(String pincode) {
         this.pincode = pincode;
     }
+
+    
+
+
+
+
+
+
+
 }
 
