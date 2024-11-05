@@ -94,6 +94,35 @@
         border: 1px solid #ccc;
         border-radius: 4px;
     }
+    .custom-marker {
+        background: none;
+        border: none;
+    }
+
+    .start-marker {
+        color: #4CAF50;
+    }
+
+    .end-marker {
+        color: #f44336;
+    }
+
+    .marker-popup, .route-popup {
+        padding: 5px;
+        font-family: Arial, sans-serif;
+    }
+
+    .leaflet-popup-content-wrapper {
+        border-radius: 8px;
+        box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+    }
+
+    /* Add Font Awesome for markers */
+    @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css');
+
+    .fa-location-dot {
+        filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.5));
+    }
   </style>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -214,7 +243,7 @@
 
       async function fetchRoutes(username = '') {
         try {
-            // Clear existing layers before fetching new routes
+            // Clear existing layers
             markersLayer.clearLayers();
             routeLayer.clearLayers();
 
@@ -237,50 +266,73 @@
                 return;
             }
 
-            // Process all routes sequentially
-            for (const route of data) {
-                let startCoords = null;
+            // First, get the user's home address (start coordinates) once
+            let startCoords = null;
+            if (data[0].username) {
+                try {
+                    const userResponse = await fetch(`/user-management/home-address?username=${encodeURIComponent(data[0].username)}`);
+                    if (!userResponse.ok) {
+                        throw new Error('Failed to fetch home address');
+                    }
+                    
+                    const userData = await userResponse.json();
+                    if (userData && userData.homeAddress && userData.pincode) {
+                        const fullAddress = `${userData.homeAddress} ${userData.pincode}`;
+                        startCoords = await geocodeAddress(fullAddress);
+                    }
+                } catch (error) {
+                    console.error('Error fetching start coordinates:', error);
+                    return;
+                }
+            }
+
+            // Add start marker only once
+            if (startCoords) {
+                L.marker([startCoords.lat, startCoords.lng], {
+                    icon: L.divIcon({
+                        className: 'custom-marker start-marker',
+                        html: '<i class="fas fa-location-dot fa-2x"></i>',
+                        iconSize: [25, 41],
+                        iconAnchor: [12, 41],
+                        popupAnchor: [1, -34]
+                    })
+                })
+                .bindPopup(`<div class="marker-popup">
+                    <strong>Home Location</strong><br>
+                    ${data[0].username}'s home
+                </div>`)
+                .addTo(markersLayer);
+            }
+
+            // Process each route
+            for (const [index, route] of data.entries()) {
                 let endCoords = null;
                 
-                // Get end coordinates
                 try {
                     endCoords = await geocodeAddress(route.endLocation + ' ' + route.pincode);
                 } catch (error) {
                     console.error('Error fetching end coordinates:', error);
-                    continue; // Skip this route if end coordinates cannot be found
-                }
-                
-                // Get start coordinates from user's home address
-                if (route.username) {
-                    try {
-                        const userResponse = await fetch(`/user-management/home-address?username=${encodeURIComponent(route.username)}`);
-                        if (!userResponse.ok) {
-                            throw new Error('Failed to fetch home address');
-                        }
-                        
-                        const userData = await userResponse.json();
-                        if (userData && userData.homeAddress && userData.pincode) {
-                            const fullAddress = `${userData.homeAddress} ${userData.pincode}`;
-                            startCoords = await geocodeAddress(fullAddress);
-                        }
-                    } catch (error) {
-                        console.error('Error fetching start coordinates:', error);
-                        continue; // Skip this route if start coordinates cannot be found
-                    }
+                    continue;
                 }
 
-                // Only proceed if we have both coordinates
                 if (startCoords && endCoords) {
-                    // Add markers for this route
-                    L.marker([startCoords.lat, startCoords.lng])
-                        .bindPopup(`Start: ${route.username}'s home`)
-                        .addTo(markersLayer);
-                    
-                    L.marker([endCoords.lat, endCoords.lng])
-                        .bindPopup(`End: ${route.endLocation}`)
-                        .addTo(markersLayer);
+                    // Add end marker
+                    L.marker([endCoords.lat, endCoords.lng], {
+                        icon: L.divIcon({
+                            className: 'custom-marker end-marker',
+                            html: '<i class="fas fa-location-dot fa-2x"></i>',
+                            iconSize: [25, 41],
+                            iconAnchor: [12, 41],
+                            popupAnchor: [1, -34]
+                        })
+                    })
+                    .bindPopup(`<div class="marker-popup">
+                        <strong>Destination ${index + 1}</strong><br>
+                        ${route.endLocation}
+                    </div>`)
+                    .addTo(markersLayer);
 
-                    // Fetch and display the route
+                    // Fetch and display route
                     try {
                         const routeResponse = await fetch(
                             `https://router.project-osrm.org/route/v1/driving/${startCoords.lng},${startCoords.lat};${endCoords.lng},${endCoords.lat}?overview=full&geometries=geojson`
@@ -293,22 +345,51 @@
                         const routeData = await routeResponse.json();
 
                         if (routeData.routes && routeData.routes.length > 0) {
-                            // Add the route with a unique color
-                            const routeColor = `#${Math.floor(Math.random()*16777215).toString(16)}`;
-                            L.geoJSON(routeData.routes[0].geometry, {
+                            // Generate a unique color for this route
+                            const hue = (index * 137.508) % 360; // Golden angle for color distribution
+                            const routeColor = `hsl(${hue}, 70%, 50%)`;
+
+                            // Add the route with enhanced styling
+                            const routeLine = L.geoJSON(routeData.routes[0].geometry, {
                                 style: {
                                     color: routeColor,
-                                    weight: 3,
-                                    opacity: 0.7
+                                    weight: 5,
+                                    opacity: 0.8,
+                                    lineCap: 'round',
+                                    lineJoin: 'round',
+                                    dashArray: null
                                 }
                             }).addTo(routeLayer);
+
+                            // Add hover effects
+                            routeLine.on('mouseover', function() {
+                                this.setStyle({
+                                    weight: 8,
+                                    opacity: 1
+                                });
+                            }).on('mouseout', function() {
+                                this.setStyle({
+                                    weight: 5,
+                                    opacity: 0.8
+                                });
+                            });
+
+                            // Add route popup
+                            routeLine.bindPopup(`
+                                <div class="route-popup">
+                                    <strong>Route ${index + 1}</strong><br>
+                                    To: ${route.endLocation}<br>
+                                    Mode: ${route.modeOfTransport}<br>
+                                    Distance: ${(routeData.routes[0].distance / 1000).toFixed(2)} km
+                                </div>
+                            `);
                         }
                     } catch (error) {
                         console.error('Error fetching route:', error);
                     }
                 }
 
-                // Add row to table
+                // Add table row
                 const row = document.createElement('tr');
                 row.dataset.id = route.id;
                 row.innerHTML = `
