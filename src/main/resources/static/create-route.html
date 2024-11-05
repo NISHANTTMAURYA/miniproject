@@ -99,6 +99,7 @@
     <th>End Location Pincode</th>
     <th>Mode of Transport</th>
     <th>Username</th>
+    <th>Coordinates</th>
     <th>Actions</th>
   </tr>
   </thead>
@@ -169,52 +170,74 @@
         });
 }
 
-      function fetchRoutes(username = '') {
-    let url = '/route-management/routes';
-    if (username) {
-        url += `?username=${encodeURIComponent(username)}`;
-    }
+      async function fetchUserHomeAddress(username) {
+        const response = await fetch(`/user-management/home-address?username=${encodeURIComponent(username)}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch home address');
+        }
+        return response.json();
+      }
 
-    fetch(url)
-        .then(response => {
+      async function fetchRoutes(username = '') {
+        try {
+            let url = '/route-management/routes';
+            if (username) {
+                url += `?username=${encodeURIComponent(username)}`;
+            }
+
+            const response = await fetch(url);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            return response.json();
-        })
-        .then(data => {
+            const data = await response.json();
+
             const routesTableBody = routesTable.querySelector('tbody');
-            routesTableBody.innerHTML = ''; // Clear the table body
+            routesTableBody.innerHTML = '';
 
             if (data.length === 0) {
                 showMessage('No routes found for the selected user.', true);
-            } else {
-                data.forEach(route => {
-                    const row = document.createElement('tr');
-                    row.dataset.id = route.id;
-                    row.innerHTML = `
-                        <td><input type="checkbox" class="route-checkbox"></td>
-                        <td>${route.id}</td>
-                        <td>${route.endLocation}</td>
-                        <td>${route.pincode}</td>
-                        <td>${route.modeOfTransport}</td>
-                        <td>${route.username || 'N/A'}</td>
-                        <td>
-                            <button class="edit-btn">Edit</button>
-                            <button class="save-btn" style="display:none;">Save</button>
-                            <button class="cancel-btn" style="display:none;">Cancel</button>
-                        </td>
-                    `;
-                    routesTableBody.appendChild(row);
-                });
+                return;
             }
-            updateDeleteSelectedButton();
-        })
-        .catch(error => {
-            console.error('Error fetching routes:', error);
+
+            for (const route of data) {
+                let startCoords = null;
+                if (username) {
+                    try {
+                        const userHome = await fetchUserHomeAddress(username);
+                        startCoords = await geocodeAddress(userHome.homeAddress);
+                    } catch (error) {
+                        console.error('Error fetching start coordinates:', error);
+                    }
+                }
+                
+                const endCoords = await geocodeAddress(route.endLocation);
+                
+                const row = document.createElement('tr');
+                row.dataset.id = route.id;
+                row.innerHTML = `
+                    <td><input type="checkbox" class="route-checkbox"></td>
+                    <td>${route.id}</td>
+                    <td>${route.endLocation}</td>
+                    <td>${route.pincode}</td>
+                    <td>${route.modeOfTransport}</td>
+                    <td>${route.username || 'N/A'}</td>
+                    <td>
+                        <strong>Start:</strong> ${startCoords ? `${startCoords.lat.toFixed(6)}, ${startCoords.lng.toFixed(6)}` : 'N/A'}<br>
+                        <strong>End:</strong> ${endCoords ? `${endCoords.lat.toFixed(6)}, ${endCoords.lng.toFixed(6)}` : 'N/A'}
+                    </td>
+                    <td>
+                        <button class="edit-btn">Edit</button>
+                        <button class="save-btn" style="display:none;">Save</button>
+                        <button class="cancel-btn" style="display:none;">Cancel</button>
+                    </td>
+                `;
+                routesTableBody.appendChild(row);
+            }
+        } catch (error) {
+            console.error('Error:', error);
             showMessage('Error fetching routes: ' + error.message, true);
-        });
-}
+        }
+      }
 
       function updateDeleteSelectedButton() {
           const checkedBoxes = document.querySelectorAll('.route-checkbox:checked');
@@ -347,6 +370,27 @@
       usernameDropdown.addEventListener('change', function(e) {
           fetchRoutes(e.target.value);
       });
+
+      async function geocodeAddress(address) {
+        const apiKey = '9289340160b7436ba65e6add726263b7'; // Replace with your OpenCage API key
+        const url = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(address)}&key=${apiKey}`;
+
+        try {
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error('Failed to geocode address');
+          }
+          const data = await response.json();
+          if (data.results && data.results.length > 0) {
+            return data.results[0].geometry;
+          } else {
+            return null;
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          return null;
+        }
+      }
   });
 </script>
 </body>
