@@ -428,7 +428,7 @@
                   <strong>Start:</strong> ${startCoords ? `${startCoords.lat.toFixed(6)}, ${startCoords.lng.toFixed(6)}` : 'N/A'}<br>
                   <strong>End:</strong> ${endCoords ? `${endCoords.lat.toFixed(6)}, ${endCoords.lng.toFixed(6)}` : 'N/A'}
               </td>
-              <td>${trafficData.duration.toFixed(2)} mins<br><small>(via ${trafficData.mode})</small></td>
+              <td>${formatDuration(trafficData.duration)}<br><small>(via ${trafficData.mode})</small></td>
               <td>
                   <button class="edit-btn">Edit</button>
                   <button class="save-btn" style="display:none;">Save</button>
@@ -813,7 +813,7 @@
                       .setContent(`
                           <div class="route-popup">
                               <strong>Route Information</strong><br>
-                              Duration: ${duration.toFixed(2)} mins<br>
+                              Duration: ${formatDuration(duration)}<br>
                               Distance: ${(data.routes[0].distance / 1000).toFixed(2)} km<br>
                               Start: ${startCoords.lat.toFixed(6)}, ${startCoords.lng.toFixed(6)}<br>
                               End: ${endCoords.lat.toFixed(6)}, ${endCoords.lng.toFixed(6)}
@@ -846,6 +846,19 @@
           });
           
           rows.forEach(row => tbody.appendChild(row));
+      }
+
+      function formatDuration(minutes) {
+          const hours = Math.floor(minutes / 60);
+          const remainingMinutes = Math.round(minutes % 60);
+          
+          if (hours === 0) {
+              return `${remainingMinutes} mins`;
+          } else if (remainingMinutes === 0) {
+              return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+          } else {
+              return `${hours} ${hours === 1 ? 'hour' : 'hours'} ${remainingMinutes} mins`;
+          }
       }
   });
 </script>
