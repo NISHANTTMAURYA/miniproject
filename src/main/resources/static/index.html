@@ -234,12 +234,36 @@
         }
 
         .flow-arrow {
+            display: flex;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.4s ease-out;
             color: #4CAF50;
             font-size: 1.5rem;
             height: 40px;
-            display: flex;
             align-items: center;
+            will-change: transform, opacity;
+        }
+
+        .flow-arrow.animate {
+            opacity: 1;
+            transform: translateY(0);
             animation: bounce 2s infinite;
+        }
+
+        .flow-arrow.showcase {
+            animation: showcaseArrow 0.3s ease forwards;
+        }
+
+        @keyframes showcaseArrow {
+            0% {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .api-tag {
@@ -458,25 +482,140 @@
             }
         }
 
-        .flow-arrow {
+        .curtain {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 0;
+            background: linear-gradient(45deg, #4CAF50, #2196F3);
+            z-index: 1000;
+            transition: height 0.8s cubic-bezier(0.86, 0, 0.07, 1);
             opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.4s ease-out;
         }
 
-        .flow-arrow.showcase {
-            animation: showcaseArrow 0.3s ease forwards;
+        .curtain.active {
+            height: 100%;
+            opacity: 1;
         }
 
-        @keyframes showcaseArrow {
-            0% {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            100% {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        .curtain-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 2rem;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .curtain.active .curtain-content {
+            opacity: 1;
+        }
+
+        .bottom-scroll-indicator {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 50px;
+            margin-bottom: 100px;
+            color: #fff;
+            opacity: 0;
+            animation: fadeIn 1s ease forwards;
+        }
+
+        .bottom-scroll-indicator-text {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            text-align: center;
+            color: #aaa;
+        }
+
+        .bottom-scroll-arrow {
+            color: #4CAF50;
+            font-size: 2rem;
+            animation: bottomBounce 2s infinite;
+        }
+
+        @keyframes bottomBounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-20px); }
+            60% { transform: translateY(-10px); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .scroll-space {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.3));
+        }
+
+        .bottom-scroll-indicator {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: #fff;
+            animation: pulse 2s infinite;
+        }
+
+        .bottom-scroll-arrow {
+            font-size: 2rem;
+            color: #4CAF50;
+            margin-top: 10px;
+            display: block;
+        }
+
+        @keyframes pulse {
+            0% { transform: translateX(-50%) scale(1); }
+            50% { transform: translateX(-50%) scale(1.1); }
+            100% { transform: translateX(-50%) scale(1); }
+        }
+
+        .scroll-trigger-section {
+            width: 100%;
+            margin-top: 20px;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .scroll-trigger-section:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-5px);
+        }
+
+        .scroll-trigger-text {
+            color: #fff;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+        }
+
+        .scroll-trigger-arrow {
+            color: #4CAF50;
+            font-size: 2rem;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(10px); }
         }
     </style>
 </head>
@@ -567,127 +706,67 @@
                     </div>
                 </div>
             </div>
+
+            <div class="scroll-trigger-section" id="scrollTrigger">
+                <div class="scroll-trigger-text">Ready to create your route?</div>
+                <i class="fas fa-chevron-down scroll-trigger-arrow"></i>
+            </div>
+            <div class="curtain"></div>
         </div>
         <button class="showcase-button">
             <i class="fas fa-play"></i>Auto Showcase
         </button>
     </div>
 
+    <div class="curtain">
+        <div class="curtain-content">
+            <i class="fas fa-route fa-spin"></i>
+            <div>Loading Route Management...</div>
+        </div>
+    </div>
+
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const flowSteps = document.querySelectorAll('.flow-step');
-            const scrollIndicator = document.querySelector('.scroll-indicator');
-            const floatingHint = document.querySelector('.floating-hint');
-            const showcaseButton = document.querySelector('.showcase-button');
-            let isShowcasing = false;
+        let isTransitioning = false;
 
-            // Intersection Observer setup
-            const observer = new IntersectionObserver((entries) => {
-                if (!isShowcasing) {
-                    entries.forEach(entry => {
-                        if (entry.isIntersecting) {
-                            entry.target.classList.add('animate');
-                        } else {
-                            entry.target.classList.remove('animate');
-                        }
-                    });
-                }
-            }, {
-                threshold: 0.2,
-                rootMargin: '-50px'
-            });
-
-            flowSteps.forEach(step => observer.observe(step));
-
-            // Showcase functionality
-            async function runShowcase() {
-                if (isShowcasing) return;
-                isShowcasing = true;
-                showcaseButton.style.opacity = '0.5';
-                showcaseButton.style.pointerEvents = 'none';
-
-                // Reset all steps and arrows
-                const flowSteps = document.querySelectorAll('.flow-step');
-                const flowArrows = document.querySelectorAll('.flow-arrow');
-                
-                [...flowSteps, ...flowArrows].forEach(element => {
-                    element.classList.remove('animate', 'showcase');
-                    element.style.opacity = '0';
-                });
-
-                // Scroll to flow section
-                const flowSection = document.querySelector('.flow-section');
-                const distance = flowSection.getBoundingClientRect().top;
-                
-                await new Promise(resolve => {
-                    window.scrollTo({
-                        top: window.scrollY + distance - 100,
-                        behavior: 'smooth'
-                    });
-                    setTimeout(resolve, 600);
-                });
-
-                // Animate steps and arrows alternately
-                for (let i = 0; i < flowSteps.length; i++) {
-                    // Animate step
-                    flowSteps[i].classList.add('showcase');
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    
-                    // Animate arrow (if not the last step)
-                    if (i < flowSteps.length - 1) {
-                        flowArrows[i].classList.add('showcase');
-                        await new Promise(resolve => setTimeout(resolve, 250));
-                    }
-                    
-                    // Scroll if needed
-                    if (i > 1) {
-                        const stepBottom = flowSteps[i].getBoundingClientRect().bottom;
-                        if (stepBottom > window.innerHeight) {
-                            window.scrollBy({
-                                top: 150,
-                                behavior: 'smooth'
-                            });
-                        }
-                    }
-                }
-
-                showcaseButton.style.opacity = '1';
-                showcaseButton.style.pointerEvents = 'auto';
-                isShowcasing = false;
+        function transitionToRoute() {
+            if (!isTransitioning) {
+                isTransitioning = true;
+                const curtain = document.querySelector('.curtain');
+                curtain.classList.add('active');
+                setTimeout(() => {
+                    window.location.href = '/create-route.html';
+                }, 600);
             }
+        }
 
-            showcaseButton.addEventListener('click', runShowcase);
+        const scrollTrigger = document.getElementById('scrollTrigger');
+        scrollTrigger.addEventListener('click', transitionToRoute);
+        scrollTrigger.addEventListener('wheel', (e) => {
+            if (e.deltaY > 0) {
+                e.preventDefault();
+                transitionToRoute();
+            }
+        });
 
-            // Scroll indicator handling
-            let scrollTimeout;
-            window.addEventListener('scroll', () => {
-                if (scrollTimeout) {
-                    clearTimeout(scrollTimeout);
-                }
-                
-                const scrollPosition = window.scrollY;
-                
-                if (scrollPosition > 100) {
-                    scrollIndicator.style.opacity = '0';
-                    floatingHint.style.opacity = '0';
-                    scrollIndicator.style.pointerEvents = 'none';
-                    floatingHint.style.pointerEvents = 'none';
-                } else {
-                    scrollIndicator.style.opacity = '1';
-                    floatingHint.style.opacity = '1';
-                    scrollIndicator.style.pointerEvents = 'auto';
-                    floatingHint.style.pointerEvents = 'auto';
+        // Preserve the flowchart animations
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('animate');
+                    // Animate the arrow after the step
+                    const nextArrow = entry.target.nextElementSibling;
+                    if (nextArrow && nextArrow.classList.contains('flow-arrow')) {
+                        setTimeout(() => {
+                            nextArrow.classList.add('animate');
+                        }, 300); // Slightly longer delay for better visual flow
+                    }
                 }
             });
+        }, { threshold: 0.3 });
 
-            scrollIndicator.addEventListener('click', () => {
-                const flowSection = document.querySelector('.flow-section');
-                const distance = flowSection.getBoundingClientRect().top;
-                window.scrollTo({
-                    top: window.scrollY + distance,
-                    behavior: 'smooth'
-                });
-            });
+        // Observe both steps and arrows
+        document.querySelectorAll('.flow-step, .flow-arrow').forEach(element => {
+            observer.observe(element);
         });
     </script>
 </body>
