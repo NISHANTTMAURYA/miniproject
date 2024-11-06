@@ -2,12 +2,17 @@ package com.miniproject.javamini.route;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 import org.json.JSONObject;
 import org.json.JSONArray;
+import java.util.List;
+import java.util.Arrays;
+import java.util.stream.Collectors;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 public class RouteController {
@@ -19,27 +24,41 @@ public class RouteController {
     private String apiKey;
 
     @GetMapping("/travel-time")
-    public String getTravelTime(
+    public ResponseEntity<String> getTravelTime(
             @RequestParam String startLat,
             @RequestParam String startLon,
             @RequestParam String endLat,
-            @RequestParam String endLon) {
+            @RequestParam String endLon,
+            @RequestParam(required = false) String mode) {
 
-        // Print the current coordinates
-        StringBuilder responseBuilder = new StringBuilder();
-        responseBuilder.append("<h3>Start Coordinates: </h3>")
-                .append("<p>Latitude: ").append(startLat).append(", Longitude: ").append(startLon).append("</p>")
-                .append("<h3>End Coordinates: </h3>")
-                .append("<p>Latitude: ").append(endLat).append(", Longitude: ").append(endLon).append("</p>");
+        try {
+            JSONObject response = new JSONObject();
+            JSONArray modes = new JSONArray();
 
-        // Optionally, if you want to keep the travel details as well, uncomment the following lines:
+            if (mode != null) {
+                // Single mode request
+                JSONObject modeDetails = new JSONObject(getTravelDetails(mode, startLat, startLon, endLat, endLon));
+                return ResponseEntity.ok(modeDetails.toString());
+            } else {
+                // Parallel processing for all modes
+                String[] transportModes = {"driving-car", "foot-walking", "cycling-regular"};
+                List<CompletableFuture<JSONObject>> futures = Arrays.stream(transportModes)
+                    .map(m -> CompletableFuture.supplyAsync(() -> 
+                        new JSONObject(getTravelDetails(m, startLat, startLon, endLat, endLon))))
+                    .collect(Collectors.toList());
 
-        responseBuilder.append(getTravelDetails("driving-car", startLat, startLon, endLat, endLon));
-        responseBuilder.append(getTravelDetails("foot-walking", startLat, startLon, endLat, endLon));
-        responseBuilder.append(getTravelDetails("cycling-regular", startLat, startLon, endLat, endLon));
+                CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+                
+                for (CompletableFuture<JSONObject> future : futures) {
+                    modes.put(future.get());
+                }
+            }
 
-
-        return responseBuilder.toString();
+            response.put("modes", modes);
+            return ResponseEntity.ok(response.toString());
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
     }
 
     private String getTravelDetails(String mode, String startLat, String startLon, String endLat, String endLon) {
@@ -53,18 +72,16 @@ public class RouteController {
             response = restTemplate.getForObject(apiUrl, String.class);
             return processResponse(response, mode);
         } catch (Exception e) {
-            return String.format("<h3>Error retrieving details for mode: %s</h3><p>%s</p>", mode, e.getMessage());
+            return String.format("{\"error\": \"%s\"}", e.getMessage());
         }
     }
 
     private String processResponse(String response, String mode) {
         JSONObject jsonResponse = new JSONObject(response);
 
-        // Check for errors in the response
         if (jsonResponse.has("error")) {
             JSONObject error = jsonResponse.getJSONObject("error");
-            return String.format("<h3>Error for mode: %s</h3><p>Error Code: %s</p><p>Message: %s</p>",
-                    mode, error.getInt("code"), error.getString("message"));
+            return String.format("{\"error\": \"%s\"}", error.getString("message"));
         }
 
         JSONArray features = jsonResponse.getJSONArray("features");
@@ -72,9 +89,13 @@ public class RouteController {
         JSONObject summary = firstFeature.getJSONObject("properties").getJSONArray("segments").getJSONObject(0);
 
         double duration = summary.getDouble("duration") / 60; // converting to minutes
+        double distance = summary.getDouble("distance") / 1000; // converting to kilometers
 
-        // Format the output for each mode
-        return String.format("<h3>Mode: %s</h3><p>Duration: %.2f minutes</p>",
-                mode, duration);
+        // Format mode name for display
+        String displayMode = mode.replace("-", " ");
+        displayMode = displayMode.substring(0, 1).toUpperCase() + displayMode.substring(1);
+
+        return String.format("{\"mode\": \"%s\", \"duration\": %.2f, \"distance\": %.2f}",
+                displayMode, duration, distance);
     }
 }

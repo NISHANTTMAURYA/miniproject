@@ -147,12 +147,68 @@
         background: transparent;
         border: none;
     }
+
+    .loading-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.8);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+        margin-top: 10px;
+        color: #333;
+        font-weight: bold;
+    }
+
+    .route-popup {
+        padding: 10px;
+        max-width: 250px;
+    }
+
+    .route-popup strong {
+        display: block;
+        margin-bottom: 5px;
+        color: #333;
+    }
+
+    .custom-marker.start-marker i {
+        color: #4CAF50;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        font-size: 24px;
+    }
   </style>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+    <div class="loading-container" id="loadingIndicator">
+        <div style="text-align: center;">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Loading routes...</div>
+        </div>
+    </div>
 
 <h1>All Routes</h1>
 <label for="username">Username:</label>
@@ -170,6 +226,7 @@
     <th>Mode of Transport</th>
     <th>Username</th>
     <th>Coordinates</th>
+    <th>Duration</th>
     <th>Actions</th>
   </tr>
   </thead>
@@ -177,6 +234,11 @@
   <!-- Rows will be dynamically added here -->
   </tbody>
 </table>
+<div id="map"></div>
+    <div id="map-loading" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 10px; border-radius: 5px; z-index: 1000;">
+        Loading route...
+    </div>
+</div>
 <h1>Route Management</h1>
 
 <div id="successMessage"></div>
@@ -199,11 +261,7 @@
   <button type="submit">Create Route</button>
 </form>
 
-<div id="map">
-    <div id="map-loading" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 10px; border-radius: 5px; z-index: 1000;">
-        Loading route...
-    </div>
-</div>
+
 
 <script>
   document.addEventListener("DOMContentLoaded", function() {
@@ -267,10 +325,16 @@
       }
 
       async function fetchRoutes(username = '') {
+        const loadingIndicator = document.getElementById('loadingIndicator');
         try {
+            loadingIndicator.style.display = 'flex'; // Show loading indicator
+            
             // Clear existing layers
             markersLayer.clearLayers();
             routeLayer.clearLayers();
+            
+            const routesTableBody = routesTable.querySelector('tbody');
+            routesTableBody.innerHTML = '';
 
             let url = '/route-management/routes';
             if (username) {
@@ -283,170 +347,102 @@
             }
             const data = await response.json();
 
-            const routesTableBody = routesTable.querySelector('tbody');
-            routesTableBody.innerHTML = '';
-
             if (data.length === 0) {
                 showMessage('No routes found for the selected user.', true);
                 return;
             }
 
-            // First, get the user's home address (start coordinates) once
-            let startCoords = null;
-            if (data[0].username) {
-                try {
-                    const userResponse = await fetch(`/user-management/home-address?username=${encodeURIComponent(data[0].username)}`);
-                    if (!userResponse.ok) {
-                        throw new Error('Failed to fetch home address');
-                    }
-                    
-                    const userData = await userResponse.json();
-                    if (userData && userData.homeAddress && userData.pincode) {
-                        const fullAddress = `${userData.homeAddress} ${userData.pincode}`;
-                        startCoords = await geocodeAddress(fullAddress);
-                    }
-                } catch (error) {
-                    console.error('Error fetching start coordinates:', error);
-                    return;
-                }
-            }
+            // Get all unique routes
+            const uniqueRoutes = [...new Map(data.map(route => [route.id, route])).values()];
+            
+            // Process all routes in parallel
+            const routePromises = uniqueRoutes.map(async route => {
+                const endCoords = await geocodeAddress(route.endLocation + ' ' + route.pincode);
+                if (!startCoords || !endCoords) return null;
 
-            // Add start marker only once
-            if (startCoords) {
-                L.marker([startCoords.lat, startCoords.lng], {
-                    icon: L.divIcon({
-                        className: 'custom-marker start-marker',
-                        html: '<i class="fa-solid fa-location-dot fa-2x"></i>',
-                        iconSize: [30, 30],
-                        iconAnchor: [15, 30],
-                        popupAnchor: [0, -30]
-                    })
-                })
-                .bindPopup(`<div class="marker-popup">
-                    <strong>Home Location</strong><br>
-                    ${data[0].username}'s home
-                </div>`)
-                .addTo(markersLayer);
-            }
-
-            // Process each route
-            for (const [index, route] of data.entries()) {
-                let endCoords = null;
+                // Get traffic data for all modes in parallel
+                const trafficData = await getTrafficData(startCoords, endCoords);
                 
-                try {
-                    endCoords = await geocodeAddress(route.endLocation + ' ' + route.pincode);
-                } catch (error) {
-                    console.error('Error fetching end coordinates:', error);
-                    continue;
-                }
+                return {
+                    route,
+                    endCoords,
+                    trafficData
+                };
+            });
 
-                if (startCoords && endCoords) {
-                    // Add end marker
-                    L.marker([endCoords.lat, endCoords.lng], {
-                        icon: L.divIcon({
-                            className: 'custom-marker end-marker',
-                            html: '<i class="fa-solid fa-location-dot fa-2x"></i>',
-                            iconSize: [30, 30],
-                            iconAnchor: [15, 30],
-                            popupAnchor: [0, -30]
-                        })
-                    })
-                    .bindPopup(`<div class="marker-popup">
-                        <strong>Destination ${index + 1}</strong><br>
-                        ${route.endLocation}
-                    </div>`)
-                    .addTo(markersLayer);
-
-                    // Fetch and display route
-                    try {
-                        const routeResponse = await fetch(
-                            `https://router.project-osrm.org/route/v1/driving/${startCoords.lng},${startCoords.lat};${endCoords.lng},${endCoords.lat}?overview=full&geometries=geojson`
-                        );
-
-                        if (!routeResponse.ok) {
-                            throw new Error('Failed to fetch route');
-                        }
-
-                        const routeData = await routeResponse.json();
-
-                        if (routeData.routes && routeData.routes.length > 0) {
-                            // Generate a unique color for this route
-                            const hue = (index * 137.508) % 360; // Golden angle for color distribution
-                            const routeColor = `hsl(${hue}, 70%, 50%)`;
-
-                            // Add the route with enhanced styling
-                            const routeLine = L.geoJSON(routeData.routes[0].geometry, {
-                                style: {
-                                    color: routeColor,
-                                    weight: 5,
-                                    opacity: 0.8,
-                                    lineCap: 'round',
-                                    lineJoin: 'round',
-                                    dashArray: null
-                                }
-                            }).addTo(routeLayer);
-
-                            // Add hover effects
-                            routeLine.on('mouseover', function() {
-                                this.setStyle({
-                                    weight: 8,
-                                    opacity: 1
-                                });
-                            }).on('mouseout', function() {
-                                this.setStyle({
-                                    weight: 5,
-                                    opacity: 0.8
-                                });
-                            });
-
-                            // Add route popup
-                            routeLine.bindPopup(`
-                                <div class="route-popup">
-                                    <strong>Route ${index + 1}</strong><br>
-                                    To: ${route.endLocation}<br>
-                                    Mode: ${route.modeOfTransport}<br>
-                                    Distance: ${(routeData.routes[0].distance / 1000).toFixed(2)} km
-                                </div>
-                            `);
-                        }
-                    } catch (error) {
-                        console.error('Error fetching route:', error);
-                    }
-                }
-
-                // Add table row
-                const row = document.createElement('tr');
-                row.dataset.id = route.id;
-                row.innerHTML = `
-                    <td><input type="checkbox" class="route-checkbox"></td>
-                    <td>${route.id}</td>
-                    <td>${route.endLocation}</td>
-                    <td>${route.pincode}</td>
-                    <td>${route.modeOfTransport}</td>
-                    <td>${route.username || 'N/A'}</td>
-                    <td>
-                        <strong>Start:</strong> ${startCoords ? `${startCoords.lat.toFixed(6)}, ${startCoords.lng.toFixed(6)}` : 'N/A'}<br>
-                        <strong>End:</strong> ${endCoords ? `${endCoords.lat.toFixed(6)}, ${endCoords.lng.toFixed(6)}` : 'N/A'}
-                    </td>
-                    <td>
-                        <button class="edit-btn">Edit</button>
-                        <button class="save-btn" style="display:none;">Save</button>
-                        <button class="cancel-btn" style="display:none;">Cancel</button>
-                    </td>
-                `;
+            // Wait for all routes to be processed
+            const processedRoutes = await Promise.all(routePromises);
+            
+            // Add markers and create table rows
+            processedRoutes.filter(Boolean).forEach(({ route, endCoords, trafficData }) => {
+                // Add markers
+                addMarkers(endCoords, route.endLocation);
+                
+                // Create and add table row
+                const row = createTableRow(route, startCoords, endCoords, trafficData);
                 routesTableBody.appendChild(row);
-            }
+                
+                // Display route on map
+                displayRouteWithColor(startCoords, endCoords, trafficData.duration, route.id);
+            });
 
-            // Fit the map bounds to show all routes
-            if (routeLayer.getLayers().length > 0) {
-                const bounds = L.featureGroup([markersLayer, routeLayer]).getBounds();
-                map.fitBounds(bounds, { padding: [50, 50] });
-            }
+            // Sort routes and fit map bounds
+            sortRoutesByDuration();
+            fitMapBounds();
 
         } catch (error) {
             console.error('Error:', error);
             showMessage('Error fetching routes: ' + error.message, true);
+        } finally {
+            loadingIndicator.style.display = 'none'; // Hide loading indicator
         }
+      }
+
+      function addMarkers(coords, location) {
+          L.marker([coords.lat, coords.lng], {
+              icon: L.divIcon({
+                  className: 'custom-marker end-marker',
+                  html: '<i class="fa-solid fa-location-dot fa-2x"></i>',
+                  iconSize: [30, 30],
+                  iconAnchor: [15, 30],
+                  popupAnchor: [0, -30]
+              })
+          })
+          .bindPopup(`<div class="marker-popup"><strong>Destination</strong><br>${location}</div>`)
+          .addTo(markersLayer);
+      }
+
+      function createTableRow(route, startCoords, endCoords, trafficData) {
+          const row = document.createElement('tr');
+          row.dataset.id = route.id;
+          row.dataset.duration = trafficData.duration;
+          
+          row.innerHTML = `
+              <td><input type="checkbox" class="route-checkbox"></td>
+              <td>${route.id}</td>
+              <td>${route.endLocation}</td>
+              <td>${route.pincode}</td>
+              <td>${route.modeOfTransport}</td>
+              <td>${route.username || 'N/A'}</td>
+              <td>
+                  <strong>Start:</strong> ${startCoords ? `${startCoords.lat.toFixed(6)}, ${startCoords.lng.toFixed(6)}` : 'N/A'}<br>
+                  <strong>End:</strong> ${endCoords ? `${endCoords.lat.toFixed(6)}, ${endCoords.lng.toFixed(6)}` : 'N/A'}
+              </td>
+              <td>${trafficData.duration.toFixed(2)} mins<br><small>(via ${trafficData.mode})</small></td>
+              <td>
+                  <button class="edit-btn">Edit</button>
+                  <button class="save-btn" style="display:none;">Save</button>
+                  <button class="cancel-btn" style="display:none;">Cancel</button>
+              </td>
+          `;
+          return row;
+      }
+
+      function fitMapBounds() {
+          if (routeLayer.getLayers().length > 0) {
+              const bounds = L.featureGroup([markersLayer, routeLayer]).getBounds();
+              map.fitBounds(bounds, { padding: [50, 50] });
+          }
       }
 
       function updateDeleteSelectedButton() {
@@ -685,6 +681,171 @@
           } finally {
               loadingElement.style.display = 'none';
           }
+      }
+
+      function sortRoutesByDuration() {
+          const tbody = document.querySelector('#routesTable tbody');
+          const rows = Array.from(tbody.querySelectorAll('tr'));
+          
+          rows.sort((a, b) => {
+              const durationA = parseFloat(a.getAttribute('data-duration') || '0');
+              const durationB = parseFloat(b.getAttribute('data-duration') || '0');
+              return durationA - durationB;
+          });
+          
+          rows.forEach(row => tbody.appendChild(row));
+      }
+
+      async function updateRouteWithTrafficData(startCoords, endCoords, row) {
+          try {
+              const modes = ['driving-car', 'foot-walking', 'cycling-regular'];
+              let bestDuration = Infinity;
+              let routeData = {};
+
+              for (const mode of modes) {
+                  const response = await fetch(`/travel-time?startLat=${startCoords.lat}&startLon=${startCoords.lng}&endLat=${endCoords.lat}&endLon=${endCoords.lng}&mode=${mode}`);
+                  const data = JSON.parse(await response.text());
+                  
+                  if (data.duration < bestDuration) {
+                      bestDuration = data.duration;
+                      routeData = data;
+                  }
+              }
+
+              // Update row with traffic information
+              const durationCell = document.createElement('td');
+              durationCell.innerHTML = `${routeData.duration.toFixed(2)} mins`;
+              row.appendChild(durationCell);
+              
+              // Store duration for sorting
+              row.setAttribute('data-duration', routeData.duration);
+              
+              // Update route color based on duration
+              const routeLine = routeLayer.getLayers().find(layer => 
+                  layer.options.routeId === row.dataset.id
+              );
+              
+              if (routeLine) {
+                  const color = getDurationColor(routeData.duration);
+                  routeLine.setStyle({ color: color });
+              }
+          } catch (error) {
+              console.error('Error updating traffic data:', error);
+          }
+      }
+
+      function getDurationColor(duration) {
+          if (duration <= 10) return '#00ff00'; // Green for quick routes
+          if (duration <= 20) return '#ffff00'; // Yellow for medium duration
+          return '#ff0000'; // Red for longer duration
+      }
+
+      async function getTrafficData(startCoords, endCoords) {
+          try {
+              const modes = ['driving-car', 'foot-walking', 'cycling-regular'];
+              const promises = modes.map(mode => 
+                  fetch(`/travel-time?startLat=${startCoords.lat}&startLon=${startCoords.lng}&endLat=${endCoords.lat}&endLon=${endCoords.lng}&mode=${mode}`)
+                  .then(res => res.json())
+              );
+
+              const results = await Promise.all(promises);
+              let bestDuration = Infinity;
+              let bestMode = null;
+
+              results.forEach((data, index) => {
+                  if (data.duration < bestDuration) {
+                      bestDuration = data.duration;
+                      bestMode = modes[index];
+                  }
+              });
+
+              return {
+                  duration: bestDuration,
+                  mode: bestMode
+              };
+          } catch (error) {
+              console.error('Error getting traffic data:', error);
+              return {
+                  duration: 0,
+                  mode: 'Unknown'
+              };
+          }
+      }
+
+      async function displayRouteWithColor(startCoords, endCoords, duration, routeId) {
+          try {
+              // Add start marker with custom icon
+              L.marker([startCoords.lat, startCoords.lng], {
+                  icon: L.divIcon({
+                      className: 'custom-marker start-marker',
+                      html: '<i class="fa-solid fa-location-dot fa-2x"></i>',
+                      iconSize: [30, 30],
+                      iconAnchor: [15, 30],
+                      popupAnchor: [0, -30]
+                  })
+              })
+              .bindPopup(`<div class="marker-popup"><strong>Start Location</strong></div>`)
+              .addTo(markersLayer);
+
+              const response = await fetch(
+                  `https://router.project-osrm.org/route/v1/driving/${startCoords.lng},${startCoords.lat};${endCoords.lng},${endCoords.lat}?overview=full&geometries=geojson`
+              );
+              
+              if (!response.ok) throw new Error('Failed to fetch route');
+              
+              const data = await response.json();
+              if (!data.routes || !data.routes.length) throw new Error('No route found');
+
+              const color = getDurationColor(duration);
+              const routeLine = L.geoJSON(data.routes[0].geometry, {
+                  style: {
+                      color: color,
+                      weight: 5,
+                      opacity: 0.8
+                  },
+                  routeId: routeId
+              }).addTo(routeLayer);
+
+              // Add route click handler
+              routeLine.on('click', function(e) {
+                  const popup = L.popup()
+                      .setLatLng(e.latlng)
+                      .setContent(`
+                          <div class="route-popup">
+                              <strong>Route Information</strong><br>
+                              Duration: ${duration.toFixed(2)} mins<br>
+                              Distance: ${(data.routes[0].distance / 1000).toFixed(2)} km<br>
+                              Start: ${startCoords.lat.toFixed(6)}, ${startCoords.lng.toFixed(6)}<br>
+                              End: ${endCoords.lat.toFixed(6)}, ${endCoords.lng.toFixed(6)}
+                          </div>
+                      `)
+                      .openOn(map);
+              });
+
+              routeLine.on('mouseover', function() {
+                  this.setStyle({ weight: 8, opacity: 1 });
+              }).on('mouseout', function() {
+                  this.setStyle({ weight: 5, opacity: 0.8 });
+              });
+
+              return routeLine;
+          } catch (error) {
+              console.error('Error displaying route:', error);
+              return null;
+          }
+      }
+
+      function sortRoutesByDuration() {
+          const tbody = document.querySelector('#routesTable tbody');
+          const rows = Array.from(tbody.querySelectorAll('tr'));
+          
+          rows.sort((a, b) => {
+              const durationA = parseFloat(a.dataset.duration || '0');
+              const durationB = parseFloat(b.dataset.duration || '0');
+              return durationA - durationB;
+          });
+          
+          rows.forEach(row => tbody.appendChild(row));
       }
   });
 </script>
