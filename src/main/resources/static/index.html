@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RouteWise - Smart Route Management</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .hero {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a1a1a, #0a0a0a);
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .animated-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(76, 175, 80, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(33, 150, 243, 0.1) 0%, transparent 50%);
+            animation: bgPulse 15s infinite alternate;
+        }
+
+        @keyframes bgPulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.1); }
+        }
+
+        .content {
+            position: relative;
+            z-index: 2;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 100px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #4CAF50;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        h1 {
+            font-size: 4rem;
+            margin-bottom: 30px;
+            line-height: 1.2;
+            background: linear-gradient(45deg, #4CAF50, #2196F3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: titleGlow 3s infinite alternate;
+        }
+
+        @keyframes titleGlow {
+            0% { filter: drop-shadow(0 0 2px rgba(76, 175, 80, 0.5)); }
+            100% { filter: drop-shadow(0 0 8px rgba(33, 150, 243, 0.8)); }
+        }
+
+        .description {
+            font-size: 1.5rem;
+            margin-bottom: 50px;
+            color: #aaa;
+            max-width: 800px;
+            line-height: 1.6;
+        }
+
+        .cta-button {
+            display: inline-block;
+            padding: 20px 40px;
+            font-size: 1.2rem;
+            text-decoration: none;
+            color: white;
+            background: linear-gradient(45deg, #4CAF50, #2196F3);
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+
+        .cta-button::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, #4CAF50, #2196F3);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .cta-button:hover::after {
+            opacity: 0.2;
+        }
+
+        .features {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-top: 80px;
+        }
+
+        .feature {
+            flex: 1;
+            max-width: 300px;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s ease;
+        }
+
+        .feature:hover {
+            transform: translateY(-10px);
+        }
+
+        .feature i {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #4CAF50, #2196F3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .feature h3 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: white;
+        }
+
+        .feature p {
+            color: #aaa;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 3rem; }
+            .features { flex-direction: column; align-items: center; }
+            .feature { max-width: 100%; }
+        }
+
+        .flow-section {
+            margin-top: 120px;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        .flow-section h2 {
+            font-size: 2.5rem;
+            margin-bottom: 50px;
+            background: linear-gradient(45deg, #4CAF50, #2196F3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+        }
+
+        .flowchart {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .flow-step {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 30px;
+            border-radius: 20px;
+            width: 100%;
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .flow-step:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .flow-icon {
+            background: linear-gradient(45deg, #4CAF50, #2196F3);
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .flow-icon i {
+            font-size: 2rem;
+            color: white;
+        }
+
+        .flow-content {
+            flex-grow: 1;
+        }
+
+        .flow-content h3 {
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+            color: white;
+        }
+
+        .flow-content p {
+            color: #aaa;
+            margin-bottom: 10px;
+        }
+
+        .flow-arrow {
+            color: #4CAF50;
+            font-size: 1.5rem;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            animation: bounce 2s infinite;
+        }
+
+        .api-tag {
+            display: inline-block;
+            padding: 5px 12px;
+            background: linear-gradient(45deg, rgba(76, 175, 80, 0.2), rgba(33, 150, 243, 0.2));
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            font-size: 0.9rem;
+            color: #fff;
+            margin-right: 10px;
+            margin-top: 5px;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(5px); }
+        }
+
+        @media (max-width: 768px) {
+            .flow-step {
+                flex-direction: column;
+                text-align: center;
+                padding: 20px;
+            }
+            
+            .flow-icon {
+                margin-bottom: 15px;
+            }
+            
+            .api-tag {
+                margin: 5px;
+            }
+        }
+
+        /* Enhanced scroll indicator */
+        .scroll-indicator {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #fff;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .scroll-indicator-text {
+            font-size: 1.2rem;
+            color: #fff;
+            margin-bottom: 15px;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeInUp 0.8s ease forwards 1s;
+        }
+
+        .scroll-indicator-line {
+            width: 2px;
+            height: 60px;
+            background: linear-gradient(to bottom, #4CAF50, #2196F3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .scroll-indicator-line::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            animation: scrollLine 2s ease-in-out infinite;
+        }
+
+        @keyframes scrollLine {
+            0% { transform: translateY(-100%); }
+            50% { transform: translateY(100%); }
+            100% { transform: translateY(100%); }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Floating text animation */
+        .floating-hint {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            color: #fff;
+            opacity: 0;
+            animation: floatIn 0.8s ease forwards 2s;
+        }
+
+        @keyframes floatIn {
+            from {
+                opacity: 0;
+                transform: translate(-50%, 20px);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, 0);
+            }
+        }
+
+        /* Reduced transition delays */
+        .flow-step:nth-child(1) { transition-delay: 0.1s; }
+        .flow-step:nth-child(2) { transition-delay: 0.2s; }
+        .flow-step:nth-child(3) { transition-delay: 0.3s; }
+        .flow-step:nth-child(4) { transition-delay: 0.4s; }
+
+        /* Floating animation for features */
+        .feature {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .feature:nth-child(2) {
+            animation-delay: -2s;
+        }
+
+        .feature:nth-child(3) {
+            animation-delay: -4s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* Gradient text reveal animation */
+        .reveal-text {
+            position: relative;
+            color: transparent;
+            background: linear-gradient(45deg, #4CAF50, #2196F3);
+            -webkit-background-clip: text;
+            background-clip: text;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.8s ease-out;
+        }
+
+        .reveal-text.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Flow steps animations - Updated for faster animations */
+        .flow-step {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.4s ease-out;
+            will-change: transform, opacity;
+        }
+
+        .flow-step.animate {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .showcase-button {
+            position: fixed;
+            bottom: 40px;
+            right: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 15px 30px;
+            border-radius: 50px;
+            color: white;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            z-index: 100;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .showcase-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .showcase-button i {
+            margin-right: 8px;
+        }
+
+        .flow-step.showcase {
+            animation: showcaseStep 0.5s ease forwards;
+        }
+
+        @keyframes showcaseStep {
+            0% {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .flow-arrow {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.4s ease-out;
+        }
+
+        .flow-arrow.showcase {
+            animation: showcaseArrow 0.3s ease forwards;
+        }
+
+        @keyframes showcaseArrow {
+            0% {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <div class="animated-bg"></div>
+        <div class="content">
+            <div class="logo">RouteWise</div>
+            <h1>Navigate Smarter, Not Harder</h1>
+            <p class="description">
+                Experience real-time route optimization with stunning visual insights. 
+                Plan your journey, track traffic patterns, and make informed decisions with our 
+                cutting-edge route management system.
+            </p>
+            <a href="/create-route.html" class="cta-button">Get Started →</a>
+
+            <div class="scroll-indicator">
+                <span class="scroll-indicator-text">Scroll to explore our technology</span>
+                <div class="scroll-indicator-line"></div>
+            </div>
+
+            <div class="features">
+                <div class="feature">
+                    <i class="fas fa-route"></i>
+                    <h3>Smart Routing</h3>
+                    <p>Real-time route optimization with traffic updates and intelligent path suggestions.</p>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-map-marked-alt"></i>
+                    <h3>Visual Mapping</h3>
+                    <p>Interactive maps with detailed visualizations of your routes and traffic patterns.</p>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-clock"></i>
+                    <h3>Time Savings</h3>
+                    <p>Save precious time with our advanced route comparison and optimization tools.</p>
+                </div>
+            </div>
+
+            <div class="flow-section">
+                <h2>How It Works</h2>
+                <div class="flowchart">
+                    <div class="flow-step">
+                        <div class="flow-icon">
+                            <i class="fas fa-user-circle"></i>
+                        </div>
+                        <div class="flow-content">
+                            <h3>User Management</h3>
+                            <p>Each user has a unique home address stored in our system, serving as the starting point for all routes</p>
+                        </div>
+                    </div>
+                    <div class="flow-arrow"><i class="fas fa-chevron-down"></i></div>
+                    
+                    <div class="flow-step">
+                        <div class="flow-icon">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                        <div class="flow-content">
+                            <h3>Geocoding</h3>
+                            <p>OpenCage API converts addresses into precise coordinates</p>
+                            <span class="api-tag">OpenCage Geocoding API</span>
+                        </div>
+                    </div>
+                    <div class="flow-arrow"><i class="fas fa-chevron-down"></i></div>
+                    
+                    <div class="flow-step">
+                        <div class="flow-icon">
+                            <i class="fas fa-traffic-light"></i>
+                        </div>
+                        <div class="flow-content">
+                            <h3>Route Analysis</h3>
+                            <p>Real-time traffic data and route optimization</p>
+                            <span class="api-tag">OpenRoute Service API</span>
+                        </div>
+                    </div>
+                    <div class="flow-arrow"><i class="fas fa-chevron-down"></i></div>
+                    
+                    <div class="flow-step">
+                        <div class="flow-icon">
+                            <i class="fas fa-map"></i>
+                        </div>
+                        <div class="flow-content">
+                            <h3>Visual Representation</h3>
+                            <p>Interactive map visualization of routes</p>
+                            <span class="api-tag">Leaflet.js</span>
+                            <span class="api-tag">OSRM</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="showcase-button">
+            <i class="fas fa-play"></i>Auto Showcase
+        </button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const flowSteps = document.querySelectorAll('.flow-step');
+            const scrollIndicator = document.querySelector('.scroll-indicator');
+            const floatingHint = document.querySelector('.floating-hint');
+            const showcaseButton = document.querySelector('.showcase-button');
+            let isShowcasing = false;
+
+            // Intersection Observer setup
+            const observer = new IntersectionObserver((entries) => {
+                if (!isShowcasing) {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            entry.target.classList.add('animate');
+                        } else {
+                            entry.target.classList.remove('animate');
+                        }
+                    });
+                }
+            }, {
+                threshold: 0.2,
+                rootMargin: '-50px'
+            });
+
+            flowSteps.forEach(step => observer.observe(step));
+
+            // Showcase functionality
+            async function runShowcase() {
+                if (isShowcasing) return;
+                isShowcasing = true;
+                showcaseButton.style.opacity = '0.5';
+                showcaseButton.style.pointerEvents = 'none';
+
+                // Reset all steps and arrows
+                const flowSteps = document.querySelectorAll('.flow-step');
+                const flowArrows = document.querySelectorAll('.flow-arrow');
+                
+                [...flowSteps, ...flowArrows].forEach(element => {
+                    element.classList.remove('animate', 'showcase');
+                    element.style.opacity = '0';
+                });
+
+                // Scroll to flow section
+                const flowSection = document.querySelector('.flow-section');
+                const distance = flowSection.getBoundingClientRect().top;
+                
+                await new Promise(resolve => {
+                    window.scrollTo({
+                        top: window.scrollY + distance - 100,
+                        behavior: 'smooth'
+                    });
+                    setTimeout(resolve, 600);
+                });
+
+                // Animate steps and arrows alternately
+                for (let i = 0; i < flowSteps.length; i++) {
+                    // Animate step
+                    flowSteps[i].classList.add('showcase');
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    // Animate arrow (if not the last step)
+                    if (i < flowSteps.length - 1) {
+                        flowArrows[i].classList.add('showcase');
+                        await new Promise(resolve => setTimeout(resolve, 250));
+                    }
+                    
+                    // Scroll if needed
+                    if (i > 1) {
+                        const stepBottom = flowSteps[i].getBoundingClientRect().bottom;
+                        if (stepBottom > window.innerHeight) {
+                            window.scrollBy({
+                                top: 150,
+                                behavior: 'smooth'
+                            });
+                        }
+                    }
+                }
+
+                showcaseButton.style.opacity = '1';
+                showcaseButton.style.pointerEvents = 'auto';
+                isShowcasing = false;
+            }
+
+            showcaseButton.addEventListener('click', runShowcase);
+
+            // Scroll indicator handling
+            let scrollTimeout;
+            window.addEventListener('scroll', () => {
+                if (scrollTimeout) {
+                    clearTimeout(scrollTimeout);
+                }
+                
+                const scrollPosition = window.scrollY;
+                
+                if (scrollPosition > 100) {
+                    scrollIndicator.style.opacity = '0';
+                    floatingHint.style.opacity = '0';
+                    scrollIndicator.style.pointerEvents = 'none';
+                    floatingHint.style.pointerEvents = 'none';
+                } else {
+                    scrollIndicator.style.opacity = '1';
+                    floatingHint.style.opacity = '1';
+                    scrollIndicator.style.pointerEvents = 'auto';
+                    floatingHint.style.pointerEvents = 'auto';
+                }
+            });
+
+            scrollIndicator.addEventListener('click', () => {
+                const flowSection = document.querySelector('.flow-section');
+                const distance = flowSection.getBoundingClientRect().top;
+                window.scrollTo({
+                    top: window.scrollY + distance,
+                    behavior: 'smooth'
+                });
+            });
+        });
+    </script>
+</body>
+</html> 
