@@ -321,12 +321,80 @@
         opacity: 1;
         transform: translateY(0);
     }
+
+    /* Add these styles for the back button */
+    .back-button {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 12px 24px;
+        border-radius: 50px;
+        color: white;
+        text-decoration: none;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+        z-index: 100;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        width: fit-content;
+    }
+
+    .back-button:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .back-button i {
+        font-size: 1.2rem;
+        transition: transform 0.3s ease;
+    }
+
+    .back-button:hover i {
+        transform: translateX(-4px);
+    }
+
+    /* Add animation for page transition */
+    .back-button.transitioning {
+        animation: fadeOut 0.5s ease forwards;
+    }
+
+    @keyframes fadeOut {
+        to {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+    }
+
+    /* Add padding to the content to accommodate the fixed back button */
+    .content {
+        padding-top: 80px; /* Increased top padding */
+    }
+
+    /* Update the main heading style */
+    h1 {
+        margin-top: 0;
+        padding-top: 20px;
+        clear: both;
+        font-size: 2.5rem;
+    }
   </style>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+    <!-- Add this button -->
+    <a href="#" class="back-button" id="backButton">
+        <i class="fas fa-arrow-left"></i>
+        Back to Home
+    </a>
+
     <div class="curtain" id="loadingIndicator">
         <div class="curtain-content">
             <i class="fas fa-route fa-spin"></i>
@@ -1030,6 +1098,30 @@
                   return `${hours} ${hours === 1 ? 'hour' : 'hours'} ${remainingMinutes} mins`;
               }
           }
+
+          // Add this with your other JavaScript
+          document.getElementById('backButton').addEventListener('click', function(e) {
+              e.preventDefault();
+              
+              // Add transitioning class for animation
+              this.classList.add('transitioning');
+              
+              // Show curtain
+              const curtain = document.getElementById('loadingIndicator');
+              curtain.classList.add('active');
+              
+              // Update curtain content
+              const curtainContent = curtain.querySelector('.curtain-content');
+              curtainContent.innerHTML = `
+                  <i class="fas fa-home fa-spin"></i>
+                  <div>Returning to Home...</div>
+              `;
+              
+              // Redirect after animation
+              setTimeout(() => {
+                  window.location.href = '/index.html';
+              }, 600);
+          });
       });
     </script>
 </body>
