@@ -254,51 +254,111 @@
         position: fixed;
         top: 0;
         left: 0;
-        width: 100%;
-        height: 0;
+        width: 100vw;
+        height: 100vh;
         background: linear-gradient(45deg, #4CAF50, #2196F3);
         z-index: 1000;
-        transition: height 0.8s cubic-bezier(0.86, 0, 0.07, 1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        visibility: hidden;
         opacity: 0;
-        transform-origin: bottom;
+        transform: translateY(-100%);
+        transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .curtain.active {
-        height: 100%;
+        visibility: visible;
         opacity: 1;
-    }
-
-    .curtain.opening {
-        height: 100%;
-        transform-origin: top;
-        transition: height 1s cubic-bezier(0.86, 0, 0.07, 1);
-    }
-
-    .curtain.closing {
-        height: 0;
-        transform-origin: bottom;
+        transform: translateY(0);
     }
 
     .curtain-content {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        color: white;
-        font-size: 2rem;
         text-align: center;
+        padding: 20px;
+        width: min(90%, 300px);
         opacity: 0;
-        transition: opacity 0.3s ease;
+        transform: translateY(20px);
+        transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .curtain.active .curtain-content {
         opacity: 1;
+        transform: translateY(0);
     }
 
     .curtain-content i {
-        font-size: 3rem;
-        margin-bottom: 20px;
+        font-size: min(3rem, 10vw);
+        margin-bottom: 15px;
         display: block;
+    }
+
+    .curtain-content div {
+        font-size: min(1.5rem, 5vw);
+        line-height: 1.4;
+        word-wrap: break-word;
+        color: white;
+    }
+
+    /* Animation keyframes */
+    @keyframes slideIn {
+        from {
+            transform: translateY(-100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes slideOut {
+        from {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateY(-100%);
+            opacity: 0;
+        }
+    }
+
+    .curtain.opening {
+        animation: slideIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+
+    .curtain.closing {
+        animation: slideOut 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+
+    /* Media queries remain the same */
+    @media (max-width: 768px) {
+        .curtain-content {
+            padding: 15px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .curtain-content {
+            padding: 10px;
+            width: 85%;
+        }
+        .curtain-content i {
+            font-size: 2.5rem;
+        }
+        .curtain-content div {
+            font-size: 1.2rem;
+        }
+    }
+
+    /* Add these styles for smoother transitions */
+    .curtain-transition {
+        transition: all 0.5s ease;
+    }
+
+    .fade-out {
+        opacity: 0;
+        transform: translateY(20px);
     }
 
     @keyframes fa-spin {
@@ -382,6 +442,44 @@
         padding-top: 20px;
         clear: both;
         font-size: 2.5rem;
+    }
+
+    /* Add responsive styles for the loading map indicator */
+    #map-loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(255, 255, 255, 0.9);
+        padding: clamp(10px, 3vw, 20px);
+        border-radius: 8px;
+        z-index: 1000;
+        font-size: clamp(0.875rem, 3vw, 1rem);
+        text-align: center;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        width: min(90%, 200px);
+    }
+
+    /* Add media queries for mobile responsiveness */
+    @media (max-width: 768px) {
+        .curtain-content {
+            padding: 15px;
+        }
+        
+        #map-loading {
+            width: 85%;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .curtain-content {
+            width: 95%;
+            padding: 10px;
+        }
+        
+        #map-loading {
+            width: 90%;
+        }
     }
   </style>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -518,97 +616,111 @@
             return response.json();
           }
 
+          function showLoadingIndicator(message = 'Loading routes...') {
+              const curtain = document.getElementById('loadingIndicator');
+              const content = curtain.querySelector('.curtain-content');
+              
+              // Update content
+              content.innerHTML = `
+                  <i class="fas fa-route fa-spin"></i>
+                  <div>${message}</div>
+              `;
+              
+              // Reset any existing animations
+              curtain.classList.remove('closing');
+              
+              // Show and animate curtain
+              curtain.classList.add('active', 'opening');
+          }
+
+          function hideLoadingIndicator() {
+              const curtain = document.getElementById('loadingIndicator');
+              
+              // Start closing animation
+              curtain.classList.remove('opening');
+              curtain.classList.add('closing');
+              
+              // Remove classes after animation
+              setTimeout(() => {
+                  curtain.classList.remove('active', 'closing');
+              }, 500);
+          }
+
           async function fetchRoutes(username = '') {
-            const loadingIndicator = document.getElementById('loadingIndicator');
-            const mainContent = document.querySelector('.content');
-            
-            try {
-                // Start loading
-                mainContent.classList.remove('content-reveal');
-                loadingIndicator.classList.add('active');
-                
-                // Clear existing layers
-                markersLayer.clearLayers();
-                routeLayer.clearLayers();
-                
-                const routesTableBody = routesTable.querySelector('tbody');
-                routesTableBody.innerHTML = '';
+              showLoadingIndicator();
+              const mainContent = document.querySelector('.content');
+              
+              try {
+                  // Clear existing layers
+                  markersLayer.clearLayers();
+                  routeLayer.clearLayers();
+                  
+                  const routesTableBody = routesTable.querySelector('tbody');
+                  routesTableBody.innerHTML = '';
 
-                let url = '/route-management/routes';
-                if (username) {
-                    url += `?username=${encodeURIComponent(username)}`;
-                }
+                  let url = '/route-management/routes';
+                  if (username) {
+                      url += `?username=${encodeURIComponent(username)}`;
+                  }
 
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
+                  const response = await fetch(url);
+                  if (!response.ok) {
+                      throw new Error(`HTTP error! status: ${response.status}`);
+                  }
+                  const data = await response.json();
 
-                if (data.length === 0) {
-                    showMessage('No routes found for the selected user.', true);
-                    return;
-                }
+                  if (data.length === 0) {
+                      showMessage('No routes found for the selected user.', true);
+                      return;
+                  }
 
-                // Get all unique routes
-                const uniqueRoutes = [...new Map(data.map(route => [route.id, route])).values()];
-                
-                // Process all routes in parallel
-                const routePromises = uniqueRoutes.map(async route => {
-                    const endCoords = await geocodeAddress(route.endLocation + ' ' + route.pincode);
-                    if (!startCoords || !endCoords) return null;
+                  // Get all unique routes
+                  const uniqueRoutes = [...new Map(data.map(route => [route.id, route])).values()];
+                  
+                  // Process all routes in parallel
+                  const routePromises = uniqueRoutes.map(async route => {
+                      const endCoords = await geocodeAddress(route.endLocation + ' ' + route.pincode);
+                      if (!startCoords || !endCoords) return null;
 
-                    // Get traffic data for all modes in parallel
-                    const trafficData = await getTrafficData(startCoords, endCoords);
-                    
-                    return {
-                        route,
-                        endCoords,
-                        trafficData
-                    };
-                });
+                      // Get traffic data for all modes in parallel
+                      const trafficData = await getTrafficData(startCoords, endCoords);
+                      
+                      return {
+                          route,
+                          endCoords,
+                          trafficData
+                      };
+                  });
 
-                // Wait for all routes to be processed
-                const processedRoutes = await Promise.all(routePromises);
-                
-                // Add markers and create table rows
-                processedRoutes.filter(Boolean).forEach(({ route, endCoords, trafficData }) => {
-                    // Add markers
-                    addMarkers(endCoords, route.endLocation);
-                    
-                    // Create and add table row
-                    const row = createTableRow(route, startCoords, endCoords, trafficData);
-                    routesTableBody.appendChild(row);
-                    
-                    // Display route on map
-                    displayRouteWithColor(startCoords, endCoords, trafficData.duration, route.id);
-                });
+                  // Wait for all routes to be processed
+                  const processedRoutes = await Promise.all(routePromises);
+                  
+                  // Add markers and create table rows
+                  processedRoutes.filter(Boolean).forEach(({ route, endCoords, trafficData }) => {
+                      // Add markers
+                      addMarkers(endCoords, route.endLocation);
+                      
+                      // Create and add table row
+                      const row = createTableRow(route, startCoords, endCoords, trafficData);
+                      routesTableBody.appendChild(row);
+                      
+                      // Display route on map
+                      displayRouteWithColor(startCoords, endCoords, trafficData.duration, route.id);
+                  });
 
-                // Sort routes and fit map bounds
-                sortRoutesByDuration();
-                fitMapBounds();
+                  // Sort routes and fit map bounds
+                  sortRoutesByDuration();
+                  fitMapBounds();
 
-                // Prepare for reveal
-                loadingIndicator.classList.add('opening');
-                
-                // Wait for data to be processed
-                await new Promise(resolve => setTimeout(resolve, 800)); // Adjust timing as needed
-                
-                // Start reveal sequence
-                loadingIndicator.classList.add('closing');
-                mainContent.classList.add('content-reveal');
-                
-                // Clean up classes after animation
-                setTimeout(() => {
-                    loadingIndicator.classList.remove('active', 'opening', 'closing');
-                    mainContent.classList.add('visible');
-                }, 1000);
-
-            } catch (error) {
-                console.error('Error:', error);
-                showMessage('Error fetching routes: ' + error.message, true);
-                loadingIndicator.classList.remove('active', 'opening', 'closing');
-            }
+                  // Hide loading indicator when done
+                  hideLoadingIndicator();
+                  mainContent.classList.add('content-reveal', 'visible');
+                  
+              } catch (error) {
+                  console.error('Error:', error);
+                  showMessage('Error fetching routes: ' + error.message, true);
+                  hideLoadingIndicator();
+              }
           }
 
           function addMarkers(coords, location) {
@@ -669,12 +781,11 @@
 
           routeForm.addEventListener('submit', async function(e) {
     e.preventDefault();
-    const loadingIndicator = document.getElementById('loadingIndicator');
     const mainContent = document.querySelector('.content');
     
     try {
         mainContent.classList.remove('content-reveal');
-        loadingIndicator.classList.add('active');
+        showLoadingIndicator('Creating route...');
         
         const formData = new FormData(routeForm);
         const routeData = Object.fromEntries(formData.entries());
@@ -700,22 +811,19 @@
             showMessage('Error creating route.', true);
         });
 
-        // Start reveal sequence
-        loadingIndicator.classList.add('opening');
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        loadingIndicator.classList.add('closing');
-        mainContent.classList.add('content-reveal');
-        
+        // Add animation sequence
         setTimeout(() => {
-            loadingIndicator.classList.remove('active', 'opening', 'closing');
-            mainContent.classList.add('visible');
+            hideLoadingIndicator();
+            mainContent.classList.add('content-reveal');
+            setTimeout(() => {
+                mainContent.classList.add('visible');
+            }, 500);
         }, 1000);
 
     } catch (error) {
         console.error('Error:', error);
         showMessage('Error creating route: ' + error.message, true);
-        loadingIndicator.classList.remove('active', 'opening', 'closing');
+        hideLoadingIndicator();
     }
 });
 
@@ -1103,24 +1211,12 @@
           document.getElementById('backButton').addEventListener('click', function(e) {
               e.preventDefault();
               
-              // Add transitioning class for animation
               this.classList.add('transitioning');
+              showLoadingIndicator('Returning to Home...');
               
-              // Show curtain
-              const curtain = document.getElementById('loadingIndicator');
-              curtain.classList.add('active');
-              
-              // Update curtain content
-              const curtainContent = curtain.querySelector('.curtain-content');
-              curtainContent.innerHTML = `
-                  <i class="fas fa-home fa-spin"></i>
-                  <div>Returning to Home...</div>
-              `;
-              
-              // Redirect after animation
               setTimeout(() => {
                   window.location.href = '/index.html';
-              }, 600);
+              }, 800);
           });
       });
     </script>
